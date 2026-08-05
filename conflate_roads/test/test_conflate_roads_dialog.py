@@ -1,0 +1,66 @@
+# coding=utf-8
+"""Dialog test.
+
+.. note:: This program is free software; you can redistribute it and/or modify
+     it under the terms of the GNU General Public License as published by
+     the Free Software Foundation; either version 2 of the License, or
+     (at your option) any later version.
+
+"""
+
+__author__ = 'philipnyakwaka24@gmail.com'
+__date__ = '2026-07-28'
+__copyright__ = 'Copyright 2026, Philip Nyakwaka'
+
+import unittest
+
+from qgis.core import Qgis
+from qgis.PyQt.QtWidgets import QDialogButtonBox, QDialog
+
+from conflate_roads_dialog import ConflateRoadsDialog
+
+from utilities import get_qgis_app
+QGIS_APP = get_qgis_app()
+
+if Qgis.QGIS_VERSION_INT >= 40000:
+    OK_BUTTON = QDialogButtonBox.StandardButton.Ok
+    CANCEL_BUTTON = QDialogButtonBox.StandardButton.Cancel
+    ACCEPTED = QDialog.DialogCode.Accepted
+    REJECTED = QDialog.DialogCode.Rejected
+else:
+    OK_BUTTON = QDialogButtonBox.Ok
+    CANCEL_BUTTON = QDialogButtonBox.Cancel
+    ACCEPTED = QDialog.Accepted
+    REJECTED = QDialog.Rejected
+
+
+class ConflateRoadsDialogTest(unittest.TestCase):
+    """Test dialog works."""
+
+    def setUp(self):
+        """Runs before each test."""
+        self.dialog = ConflateRoadsDialog(None)
+
+    def tearDown(self):
+        """Runs after each test."""
+        self.dialog = None
+
+    def test_dialog_ok(self):
+        """Test we can click OK."""
+        button = self.dialog.button_box.button(OK_BUTTON)
+        button.click()
+        result = self.dialog.result()
+        self.assertEqual(result, ACCEPTED)
+
+    def test_dialog_cancel(self):
+        """Test we can click cancel."""
+        button = self.dialog.button_box.button(CANCEL_BUTTON)
+        button.click()
+        result = self.dialog.result()
+        self.assertEqual(result, REJECTED)
+
+if __name__ == "__main__":
+    suite = unittest.makeSuite(ConflateRoadsDialogTest)
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite)
+
