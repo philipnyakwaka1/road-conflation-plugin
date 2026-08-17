@@ -62,18 +62,18 @@ class ConflateRoadsDialog(QtWidgets.QDialog, FORM_CLASS):
         ])
         self.cmbRoadPattern.setCurrentIndex(0)
 
-        # populate attributes when the destination layer changes
-        self.cmbDestinationLayer.layerChanged.connect(
-            self.populate_destination_fields
+        # populate attributes when the source layer changes
+        self.cmbSourceLayer.layerChanged.connect(
+            self.populate_source_fields
         )
 
-        # Populate immediately if a destination layer is already selected
-        self.populate_destination_fields(self.cmbDestinationLayer.currentLayer())
+        # Populate immediately if a source layer is already selected
+        self.populate_source_fields(self.cmbSourceLayer.currentLayer())
 
         # connect the output file selection button to the file dialog
         self.btnBrowseOutput.clicked.connect(self.select_output_file)
 
-    def populate_destination_fields(self, layer):
+    def populate_source_fields(self, layer):
         self.cmbAttributes.clear()
         if layer is None:
             return

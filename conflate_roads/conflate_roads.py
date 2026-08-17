@@ -21,11 +21,16 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import QLocale, QTranslator, QCoreApplication
-from qgis.core import QgsSettings
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QFileDialog
+from conflate_roads.tasks import ConflationTask
+from .exceptions import ConflationCancelledException
 from .resources import *
+from qgis.PyQt.QtCore import QLocale, QTranslator, QCoreApplication, Qt
+from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtWidgets import QAction, QMessageBox, QMessageBox, QProgressDialog
+from qgis.core import (
+    QgsSettings, QgsVectorFileWriter, Qgis,
+    QgsProject, QgsVectorLayer, QgsApplication
+)
 
 # Import the code for the dialog
 from .conflate_roads_dialog import ConflateRoadsDialog
@@ -179,7 +184,108 @@ class ConflateRoads:
                 action)
             self.iface.removeToolBarIcon(action)
 
+    def conflation_finished(self, task, output_path, progress):
+        """custom callback function to handle the completion of the conflation task"""
+        progress.close()
 
+        # If the task completed successfully, write the output to the specified file format
+        driver = "GPKG" if output_path.lower().endswith('.gpkg') else \
+            "ESRI Shapefile" if output_path.lower().endswith('.shp') else "GeoJSON"
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.driverName = driver
+        options.fileEncoding = "UTF-8"
+        options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+        
+        result = QgsVectorFileWriter.writeAsVectorFormatV3(
+            task.destination_layer,
+            output_path,
+            QgsProject.instance().transformContext(),
+            options
+        )
+
+        if result[0] == QgsVectorFileWriter.NoError:
+            self.iface.messageBar().pushMessage(
+                "Success",
+                "Road conflation completed successfully",
+                level=Qgis.Success,
+                duration=5
+            )
+
+            reply = QMessageBox.question(
+                self.dlg,
+                "Conflation Complete",
+                "The road networks have been successfully conflated.\n\n"
+                f'Total features: {task.match_stats["total_features"]}\n'
+                f'Matched features: {task.match_stats["matched_features"]}\n'
+                f'Unmatched features: {task.match_stats["unmatched_features"]}\n\n'
+                f"The output has been saved to:\n{output_path}\n\n"
+                "Would you like to add the output layer to the current project?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+
+            if reply == QMessageBox.Yes:
+                layer_name = os.path.splitext(os.path.basename(output_path))[0]
+
+                layer = QgsVectorLayer(output_path, layer_name, "ogr")
+
+                if layer.isValid():
+                    QgsProject.instance().addMapLayer(layer)
+                else:
+                    QMessageBox.critical(
+                        self.dlg,
+                        "Layer Load Failed",
+                        "The output was created successfully, but it could not be added to the project."
+                    )
+        else:
+            self.iface.messageBar().pushMessage(
+                "Output Failed",
+                "The conflation completed, but the output could not be saved.",
+                level=Qgis.Critical,
+                duration=0
+            )
+            QMessageBox.critical(
+                self.dlg,
+                "Output Failed",
+                "The conflation completed, but the output could not be saved."
+                f"Error code: {result[0]}\n\n"
+                f"Error message:\n{result[1]}"
+            )   
+
+    def conflation_terminated(self, task, progress):
+        """custom callback function to handle the termination of the conflation task"""
+        progress.close()
+        
+        if isinstance(task.exception, ConflationCancelledException):
+            self.iface.messageBar().pushMessage(
+                "Conflation Cancelled",
+                "The conflation process was cancelled. "
+                "Changes have been rolled back.",
+                level=Qgis.Warning,
+                duration=8
+            )
+
+            QMessageBox.warning(
+                self.dlg,
+                "Conflation Cancelled",
+                "The conflation process was cancelled.\n\n"
+                "All changes have been rolled back."
+            )
+            return
+        
+        if task.exception is not None:
+            self.iface.messageBar().pushMessage(
+                "Conflation Failed",
+                str(task.exception),
+                level=Qgis.Critical,
+                duration=0
+            )
+            QMessageBox.critical(
+                self.dlg,
+                "Conflation Failed",
+                str(task.exception)
+            )
+    
     def run(self):
         """Run method that performs all the real work"""
 
@@ -195,6 +301,36 @@ class ConflateRoads:
         result = self.dlg.exec_()
         # See if OK was pressed
         if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
+            source_layer = self.dlg.cmbSourceLayer.currentLayer().clone()  # Copy to avoid modifying the original layer
+            destination_layer = self.dlg.cmbDestinationLayer.currentLayer().clone()  # Copy to avoid modifying the original layer
+            attributes = self.dlg.cmbAttributes.checkedItems()
+            road_pattern = self.dlg.cmbRoadPattern.currentText()
+            threshold = self.dlg.spnSearchBuffer.value()
+            output_path = self.dlg.txtOutputFile.text()
+
+            task = ConflationTask(
+                description="Conflating road networks...",
+                source_layer=source_layer,
+                destination_layer=destination_layer,
+                fields=attributes,
+                pattern=road_pattern,
+                threshold=threshold
+            )
+
+            progress = QProgressDialog(
+                "Conflating road networks...", "Cancel", 0, 100, self.dlg
+                )
+            progress.setWindowTitle("Conflation Progress")
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setAutoClose(False)
+            progress.setAutoReset(False)
+
+            task.progressChanged.connect(lambda value: progress.setValue(int(value)))
+            progress.canceled.connect(lambda: task.cancel())
+
+            progress.show()
+
+            task.taskCompleted.connect(lambda: self.conflation_finished(task, output_path, progress))
+            task.taskTerminated.connect(lambda: self.conflation_terminated(task, progress))
+
+            QgsApplication.taskManager().addTask(task)
