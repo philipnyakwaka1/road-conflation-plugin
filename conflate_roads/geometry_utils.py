@@ -21,7 +21,7 @@ try:
             QgsVectorLayer,
 			QgsTask
     )
-	from.exceptions import ConflationCancelledException
+	from .exceptions import ConflationCancelledException
 except ImportError as e:
     error_msg = f'This plugin requires {e.name}. Please install {e.name} in your QGIS Python environment.'
 
@@ -82,7 +82,7 @@ def get_orientation_class(geometry: QgsGeometry) -> Union[int, None]:
 	dx = coords[-1].x() - coords[0].x()
 	dy = coords[-1].y() - coords[0].y()
 	angle = math.degrees(math.atan2(dx, dy)) % 360
-    
+
 	if (337.5 <= angle <= 360) or (0 <= angle < 22.5) or (157.5 <= angle < 202.5):
 		return 1
 	elif (22.5 <= angle < 67.5) or (202.5 <= angle < 247.5):
@@ -165,22 +165,29 @@ def compute_modified_connectivity(layer: QgsVectorLayer, index: QgsSpatialIndex,
 	candidate_ids = set(index.intersects(start_rect))
 	candidate_ids.update(index.intersects(end_rect))
 	count = 0
+	seen_feature_ids = set()
 	for candidate_id in candidate_ids:
 
 		if task and task.isCanceled():
 			raise ConflationCancelledException("Conflation process was cancelled. Changes have been rolled back.")
 
-		if candidate_id == feature.id():
-			continue
 		candidate = layer.getFeature(candidate_id)
-		other_geom = candidate.geometry()
+		if not candidate.isValid():
+			continue
+		candidate_feature_id = candidate.id()
+		candidate_geom = candidate.geometry()
+		if candidate_feature_id == feature.id() or candidate_geom.equals(geom):
+			continue
+		if candidate_feature_id in seen_feature_ids:
+			continue
 		if (
-			other_geom.distance(start_geom) <= tolerance
+			candidate_geom.distance(start_geom) <= tolerance
 			or
-			other_geom.distance(end_geom) <= tolerance
+			candidate_geom.distance(end_geom) <= tolerance
 		):
 			count += 1
-		return count
+			seen_feature_ids.add(candidate_feature_id)
+	return count
 
 def compute_mean_triangle_edges(layer: QgsVectorLayer, task: QgsTask = None) -> dict:
 	"""Builds a Delaunay triangulation from line centroids and calculates

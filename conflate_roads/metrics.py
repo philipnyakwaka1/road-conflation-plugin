@@ -93,34 +93,32 @@ def calculate_feature_metrics(layer: QgsVectorLayer, sindex: QgsSpatialIndex, me
 
 	return metrics_dict, stats, True
 
-def calculate_global_statistics(source_stats: dict, destination_stats: dict)\
-	  -> tuple[Union[float, None], Union[float, None], Union[float, None]]:
-    """Calculate global statistics for sinuosity variance, mean perpendicular distance, 
-	and mean triangle edge length. These are used during feature matching."""
+def calculate_global_statistics(source_stats: dict, destination_stats: dict) -> tuple[Union[float, None], Union[float, None], Union[float, None]]:
+    """Calculate global statistics for sinuosity variance, mean perpendicular distance,
+    and mean triangle edge length. These are used during feature matching."""
 
     values = [
         v for v in (
-            source_stats["var_sinuosity"],
-            destination_stats["var_sinuosity"],
+            source_stats.get("var_sinuosity"),
+            destination_stats.get("var_sinuosity"),
         )
         if v is not None
     ]
     max_var_sinuosity = max(values) if values else None
 
     std_perp_dist = _population_standard_deviation(
-        source_stats["perp"] + destination_stats["perp"],
-        source_stats["perp_sq"] + destination_stats["perp_sq"],
-        source_stats["perp_count"] + destination_stats["perp_count"],
+        source_stats.get("perp", 0.0) + destination_stats.get("perp", 0.0),
+        source_stats.get("perp_sq", 0.0) + destination_stats.get("perp_sq", 0.0),
+        source_stats.get("perp_count", 0) + destination_stats.get("perp_count", 0),
     )
 
     std_mean_tri_edges = _population_standard_deviation(
-        source_stats["tri_edge"] + destination_stats["tri_edge"],
-        source_stats["tri_edge_sq"] + destination_stats["tri_edge_sq"],
-        source_stats["tri_edge_count"] + destination_stats["tri_edge_count"],
+        source_stats.get("tri_edge", 0.0) + destination_stats.get("tri_edge", 0.0),
+        source_stats.get("tri_edge_sq", 0.0) + destination_stats.get("tri_edge_sq", 0.0),
+        source_stats.get("tri_edge_count", 0) + destination_stats.get("tri_edge_count", 0),
     )
 
     return max_var_sinuosity, std_perp_dist, std_mean_tri_edges
-
 def _assign_sinuosity_levels(metrics_map: dict, max_var_sinuosity: float) -> None:
 	"""Assigns sinuosity levels to features based on their sinuosity values and the global variance."""
 	for metrics in metrics_map.values():

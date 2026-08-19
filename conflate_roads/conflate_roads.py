@@ -28,7 +28,7 @@ from qgis.PyQt.QtCore import QLocale, QTranslator, QCoreApplication, Qt
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QMessageBox, QMessageBox, QProgressDialog
 from qgis.core import (
-    QgsSettings, QgsVectorFileWriter, Qgis,
+    QgsSettings, QgsVectorFileWriter, Qgis, QgsWkbTypes,
     QgsProject, QgsVectorLayer, QgsApplication
 )
 
@@ -191,11 +191,17 @@ class ConflateRoads:
         # If the task completed successfully, write the output to the specified file format
         driver = "GPKG" if output_path.lower().endswith('.gpkg') else \
             "ESRI Shapefile" if output_path.lower().endswith('.shp') else "GeoJSON"
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except OSError:
+                raise Exception(f"Failed to replace existing file: {output_path}. Please ensure the file is not open in another application.")
+
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = driver
         options.fileEncoding = "UTF-8"
-        options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
-        
+        options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
+
         result = QgsVectorFileWriter.writeAsVectorFormatV3(
             task.destination_layer,
             output_path,
@@ -285,6 +291,27 @@ class ConflateRoads:
                 "Conflation Failed",
                 str(task.exception)
             )
+
+    def create_independent_copy(self, layer: QgsVectorLayer) -> QgsVectorLayer:
+        """Create a completely independent in-memory copy of a vector layer."""
+
+        geometry_type = QgsWkbTypes.displayString(layer.wkbType())
+        crs = layer.crs().authid()
+
+        copy = QgsVectorLayer(
+            f"{geometry_type}?crs={crs}",
+            "temporary_copy",
+            "memory"
+        )
+
+        provider = copy.dataProvider()
+
+        provider.addAttributes(layer.fields())
+        copy.updateFields()
+
+        provider.addFeatures(layer.getFeatures())
+
+        return copy
     
     def run(self):
         """Run method that performs all the real work"""
@@ -301,8 +328,8 @@ class ConflateRoads:
         result = self.dlg.exec_()
         # See if OK was pressed
         if result:
-            source_layer = self.dlg.cmbSourceLayer.currentLayer().clone()  # Copy to avoid modifying the original layer
-            destination_layer = self.dlg.cmbDestinationLayer.currentLayer().clone()  # Copy to avoid modifying the original layer
+            source_layer = self.create_independent_copy(self.dlg.cmbSourceLayer.currentLayer())
+            destination_layer = self.create_independent_copy(self.dlg.cmbDestinationLayer.currentLayer())
             attributes = self.dlg.cmbAttributes.checkedItems()
             road_pattern = self.dlg.cmbRoadPattern.currentText()
             threshold = self.dlg.spnSearchBuffer.value()

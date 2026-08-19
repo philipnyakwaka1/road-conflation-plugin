@@ -1,4 +1,24 @@
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+**/.pytest_cache/
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+._*
+__MACOSX/
+*.zip
+
+# Generated Qt and documentation output
+ui_*.py
+*_rc.py
+conflate_roads/help/build/
+
+# Local QGIS and packaging artifacts
+symbology-style.db
+.package-staging/
