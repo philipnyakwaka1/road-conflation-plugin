@@ -46,3 +46,13 @@ def test_plugin_add_action_registers_action():
     assert action.isEnabled() is True
     assert len(plugin.actions) == 1
 
+
+
+
+
+
+
+
+
+
+

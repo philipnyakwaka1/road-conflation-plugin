@@ -5,12 +5,12 @@
 [general]
 name=Conflate Roads
 qgisMinimumVersion=3.0
-description=This plugin conflates road network datasets by matching road segments using geometric and topological similarity metrics, then transfers selected attributes from a reference dataset to a target dataset.
-version=0.1
+description=Matches corresponding road features using weighted geometric and topological similarity measures, then transfers selected source attributes to a destination layer.
+version=0.1.0
 author=Philip Nyakwaka
 email=philipnyakwaka24@gmail.com
 
-about=This plugin conflates road network datasets by matching road segments using geometric and topological similarity metrics, then transfers selected attributes from a reference dataset to a target dataset.
+about=Conflate Roads matches corresponding road features using six weighted geometric and topological similarity measures, then transfers selected attributes from a source layer to a destination layer. Requires the external Python package scipy in the QGIS Python environment. See the project README for installation, usage, testing, data preparation, and dependency instructions.
 
 tracker=https://github.com/philipnyakwaka1/road-conflation-plugin/issues
 repository=https://github.com/philipnyakwaka1/road-conflation-plugin
@@ -25,8 +25,9 @@ hasProcessingProvider=no
 # Tags are comma separated with spaces allowed
 tags=conflation, road networks, transportation, GIS, QGIS, OpenStreetMap, vector, matching, topology, geometry
 
-homepage=https://github.com/philipnyakwaka1/road-conflation-plugin
+homepage=https://github.com/philipnyakwaka1/road-conflation-plugin/blob/main/README.md
 category=Vector
+license=GPL-2.0-or-later
 icon=icon.png
 # experimental flag
 experimental=False
